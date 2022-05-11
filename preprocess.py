@@ -1,29 +1,29 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
 # from sklearn.model_selection import train_test_split
+import seaborn as sns
 
 def classify_price(x):
+    '''
+    Mapping function that converts prices into sepearate categories 
+    '''
     range1 = 400000
     range2 = 800000
     range3 = 1200000
     
     if x < range1:
         return 0
-        return range2
-        return '400,000'
+
     elif x < range2:
         return 1
-        return range1
-        return '800,000'
+
     elif x < range3:
         return 2
-        return range3
-        return '1,200,000'
+
     else:
         return 3
-        # return 2000000
-        return '>1200000'
 
 
 def outliers_range_iqr(data, column, distance = 1.5):
@@ -38,6 +38,7 @@ def find_outliers_iqr(data, column):
     lower_threshold, upper_threshold = outliers_range_iqr(data, column)
     outliers = []
     for i in data[column]:
+        # print(i)
         if i > upper_threshold:
             outliers.append(i)
         elif i < lower_threshold:
@@ -53,58 +54,88 @@ def remove_outliers_iqr(data, column):
     data_new = data[~data[column].isin(outliers)]
     return data_new
 
-# data = remove_outliers_iqr(data, 'price')
 
-#maybe only remove outliers for float not caregories
-# for column in data.columns:
-#     data = remove_outliers_iqr(data, column)
 
-# data['price'] = data['price'].apply(classify_price)
+def apply_basement(x):
+    '''
+    Mapping function that converts sqft_basement to binary (basement/no basement)
+    '''
+    if x>0:
+        return 1
+    else:
+        return 0
+
 
 def bar_plot(data, col, xlabel):
+    '''
+    Creates a bar plot based on a column of interest
+    '''
     fig, my_ax = plt.subplots()
     hist = data[col].value_counts().plot(kind='bar')
     my_ax.set_xlabel(xlabel)
     plt.xticks(rotation = 0)
     plt.show(hist)
 
-def get_data():
+
+def get_data(is_classification):
+    '''
+    Function that returns the training and testing data as numpy arrays
+    '''
     file_path = "kc_house_data.csv"
     data = pd.read_csv(file_path)
 
     data['yr_renovated'] = np.where(data['yr_renovated'] > 0, 1, 0)
     data['age'] = data['yr_built'].apply(lambda x: 2015-x)
+    data['sqft_basement'] = data['sqft_basement'].apply(apply_basement)
 
-    data['price'] = data['price'].apply(classify_price)
-    data = data.drop(columns=['id', 'date', 'yr_built']) 
+    data = data.drop(columns=['id', 'date', 'yr_built','lat', 'long'])
 
-    msk = np.random.rand(len(data)) < 0.8
+    # top_feats = find_corr(data)
+    # print(top_feats)
+    # data = data[top_feats]
+    # data = remove_outliers_iqr(data, 'price')
+    # for col in data.columns:
+    #     if col != 'price':
+    #         new_data = data[[col, 'price']]
+    #         print(new_data)
+    #         new_data = remove_outliers_iqr(new_data, 'price')
+    #         data[col] = new_data[col]
 
-    train = data[msk]
-    test = data[~msk]
+    # data = data.dropna()
+
+    if(is_classification):
+        data['price'] = data['price'].apply(classify_price)
+    
+    print(data)
+    x = data.drop('price',axis =1).values
+    y = data['price'].values
+
+    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size = 0.2)
+
+    mask = np.random.rand(len(data)) < 0.75
+    train = data[mask]
+    test = data[~mask]
     
     train_labels = train['price']
     test_labels = test['price']
 
-    # train_labels = train['price'].apply(classify_price)
-    # test_labels = test['price'].apply(classify_price)
-
-    train = train.drop(columns=['price']) 
-    test = test.drop(columns='price')
-    # labels.to_numpy()
-
-    return  train, train_labels, test, test_labels
+    return X_train, y_train, X_test,  y_test, X_train.shape[1]
+    
+    return  train.to_numpy(), train_labels.to_numpy(), test.to_numpy(), test_labels.to_numpy(), len(train.columns)
 
 
-# bar_plot('price', xlabel = 'House price')
-# bar_plot('bedrooms', '# bedrooms')
-# bar_plot('condition', 'condition')
 
-# print(data.columns)
-# d = data[['price', 'grade', 'condition']]
-# print(d['grade'])
+def find_corr(train):
+    '''
+    Helper function used to find correlation with price
+    '''
+    top_features = train.corr()[['price']].sort_values(by=['price'],ascending=False).head(10)
+    plt.figure(figsize=(5,10))
+    sns.heatmap(top_features,cmap='rainbow',annot=True,annot_kws={"size": 16},vmin=-1)
+    # plt.show()
+    print(top_features.index)
+    return top_features.index
 
-# corr = d.corr(method='pearson')
-# print(corr)
 
+# get_data(True)
 
